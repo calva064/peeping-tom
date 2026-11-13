@@ -17,16 +17,25 @@ const colorList = ["#87b9c8", "#699954", "#c385be", "#4bc5ac", "#c9a53e"];
 
 //create arrays to store text for each side
 let tooltipTextArrays = { left: [], right: [] };
-const MAX_LINES = 6; // keep only the most recent lines per side so text never runs off screen
+
+// Render one side, then drop the oldest lines only once the text would run past the bottom of the screen
+function renderSide(side) {
+    const arr = tooltipTextArrays[side];
+    const panel = (side === "right") ? tooltipR : tooltipL;
+    const render = () => panel.html(arr.map(entry => `<div style="color: ${entry.color}; margin-bottom: 0.8em;">${entry.text}</div>`).join(""));
+    render();
+    const node = panel.node();
+    while (arr.length > 1 && node.scrollHeight > node.clientHeight) {
+        arr.shift();
+        render();
+    }
+}
 
 // Function to update the tooltip text (left panel = what you'd expect, right panel = what the platform holds)
 function updateTooltipText(newText, side) {
     side = (side === "right") ? "right" : "left"; // "left" and "center" go on the left panel
-    const arr = tooltipTextArrays[side];
-    arr.push({ text: newText, color: getRandomColorFromList(side) });
-    if (arr.length > MAX_LINES) arr.shift();
-    const panel = (side === "right") ? tooltipR : tooltipL;
-    panel.html(arr.map(entry => `<div style="color: ${entry.color}; margin-bottom: 0.8em;">${entry.text}</div>`).join(""));
+    tooltipTextArrays[side].push({ text: newText, color: getRandomColorFromList(side) });
+    renderSide(side);
 }
 
 
@@ -297,3 +306,10 @@ function ready(data) {
 const tooltipL = d3.select("body").append("div").attr("class", "tooltip tooltip-left");
 const tooltipR = d3.select("body").append("div").attr("class", "tooltip tooltip-right");
 const tooltipC = d3.select("body").append("div").attr("class", "tooltip-center").style("visibility", "hidden");
+
+// Re-fit when photos/videos finish loading (their height isn't known until then)
+["left", "right"].forEach(side => {
+    const node = (side === "right" ? tooltipR : tooltipL).node();
+    node.addEventListener("load", () => renderSide(side), true);
+    node.addEventListener("loadeddata", () => renderSide(side), true);
+});
