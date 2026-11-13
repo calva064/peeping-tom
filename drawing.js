@@ -18,13 +18,36 @@ const colorList = ["#87b9c8", "#699954", "#c385be", "#4bc5ac", "#c9a53e"];
 //create arrays to store text for each side
 let tooltipTextArrays = { left: [], right: [] };
 
+// Spacers that make the text wrap around the figure's real silhouette (head, arms, body) instead of leaving one wide margin
+function spacersHTML(side, panelNode) {
+    const mid = window.innerWidth / 2, gap = 14;
+    const cs = getComputedStyle(panelNode);
+    const contentTop = parseFloat(cs.paddingTop), edge = parseFloat(side === "left" ? cs.paddingRight : cs.paddingLeft);
+    const r = id => { const el = document.getElementById(id); return el ? el.getBoundingClientRect() : null; };
+    const reach = rect => rect ? Math.max(0, side === "left" ? mid - rect.left : rect.right - mid) : 0;
+    const arm = r("arm_" + side);
+    if (!arm) return "";
+    const bodyRects = ["top_", "leg_", "foot_"].map(p => r(p + side)).filter(Boolean);
+    const headRects = ["face", "hair"].map(r).filter(Boolean);
+    const w = rect => Math.max(0, Math.max(...[].concat(rect).map(reach)) + gap - edge);
+    const armTop = Math.max(0, arm.top - contentTop), armBottom = Math.max(armTop, arm.bottom - contentTop);
+    const figBottom = Math.max(armBottom, Math.max(...bodyRects.map(x => x.bottom)) - contentTop);
+    const bands = [
+        [armTop, w(headRects)],
+        [armBottom - armTop, w(arm)],
+        [figBottom - armBottom, w(bodyRects)]
+    ];
+    const f = side === "left" ? "right" : "left";
+    return bands.filter(b => b[0] > 0).map(b => `<div style="float:${f};clear:${f};width:${b[1]}px;height:${b[0]}px"></div>`).join("");
+}
+
 // Render one side, then drop the oldest lines only once the text would run past the bottom of the screen
 function renderSide(side) {
     const arr = tooltipTextArrays[side];
     const panel = (side === "right") ? tooltipR : tooltipL;
-    const render = () => panel.html(arr.map(entry => `<div style="color: ${entry.color}; margin-bottom: 0.8em;">${entry.text}</div>`).join(""));
-    render();
     const node = panel.node();
+    const render = () => panel.html(spacersHTML(side, node) + arr.map(entry => `<div style="color: ${entry.color}; margin-bottom: 0.8em;">${entry.text}</div>`).join(""));
+    render();
     while (arr.length > 1 && node.scrollHeight > node.clientHeight) {
         arr.shift();
         render();
@@ -313,3 +336,5 @@ const tooltipC = d3.select("body").append("div").attr("class", "tooltip-center")
     node.addEventListener("load", () => renderSide(side), true);
     node.addEventListener("loadeddata", () => renderSide(side), true);
 });
+
+window.addEventListener("resize", () => { renderSide("left"); renderSide("right"); });
