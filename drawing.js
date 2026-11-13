@@ -15,31 +15,25 @@ Promise.all([
 //create color array for right-hand side
 const colorList = ["#87b9c8", "#699954", "#c385be", "#4bc5ac", "#c9a53e"];
 
-//create array to store text
-let tooltipTextArray = [];
+//create arrays to store text for each side
+let tooltipTextArrays = { left: [], right: [] };
+const MAX_LINES = 6; // keep only the most recent lines per side so text never runs off screen
 
-
-// Function to update the tooltip text
-function updateTooltipText(newText, isLeft) {
-	// Get random color for the new line of text
-    const randomColor = getRandomColorFromList(isLeft);
-    
-    // Add the new text and its color to the array
-    //unshift rather than push makes the text move
-    tooltipTextArray.push({ text: newText, color: randomColor });
-
-    // Display all text in the tooltip, each with its own color (preserved)
-    tooltip.html(tooltipTextArray.map(entry => {
-        return `<span style="color: ${entry.color}">${entry.text}</span>`; // Apply the stored color
-    }).join("<br>")); // Join the text with line breaks
-
+// Function to update the tooltip text (left panel = what you'd expect, right panel = what the platform holds)
+function updateTooltipText(newText, side) {
+    side = (side === "right") ? "right" : "left"; // "left" and "center" go on the left panel
+    const arr = tooltipTextArrays[side];
+    arr.push({ text: newText, color: getRandomColorFromList(side) });
+    if (arr.length > MAX_LINES) arr.shift();
+    const panel = (side === "right") ? tooltipR : tooltipL;
+    panel.html(arr.map(entry => `<div style="color: ${entry.color}; margin-bottom: 0.8em;">${entry.text}</div>`).join(""));
 }
 
 
 //get random color from color array
 function getRandomColorFromList(isLeft) {
     let color;
-    if (isLeft == "left" ){
+    if (isLeft != "right"){
         color = "black"
     }
     else{
@@ -121,28 +115,7 @@ function ready(data) {
             const isLeftPart = partId.includes("left");
 
 
-            if (isLeftPart) { // If the body part contains "left"
-                tooltip
-                    .style("left", "2vw") // Position near the left edge of the screen
-                    .style("font-family", "Open Sans, sans-serif")
-                    // .style("background-color", "#ffffff") // Set the background color
-
-            } else if (partId.includes("right")) { // If the body part contains "right"
-                tooltip
-                    .style("left", "52vw") // Position near the right edge of the screen
-                    .style("font-family", "Fira Code, monospace")
-                    // .style("background-color", "#1f1f1f")
-
-
-            } else { // For parts that don't contain "left" or "right"
-                tooltip
-                    .style("left", "30vw")
-                    .style("top", "23vw")
-                    .style("text-align", "center")
-                    .style("font-family", "Fira Code, monospace")
-                    // .style("background-color", "#e6e6e6") // Set the background color
-                    .style("z-index", "1000");
-            }
+            // (tooltip positioning is now handled by the two fixed panels in CSS)
 
 // update tooltip text -------------------------------------------------------------
 
@@ -238,11 +211,10 @@ function ready(data) {
                 const imageUrl = "profile.jpg";
 
               // Clear previous tooltip content and add the image
-                tooltip.html(`<img src="${imageUrl}" style="max-width: 200px; max-height: 200px;"><p>I have your profile photo.</p>`);
+                updateTooltipText(`<img src="${imageUrl}" style="max-width: 200px; max-height: 200px;">`, "left");
 
 
                 // Make the tooltip visible and style it
-                tooltip.style("visibility", "visible");
 
                 d3.select(this)
                     .transition()
@@ -253,10 +225,9 @@ function ready(data) {
            else if (partId === "eye_left") {
             const mediaFolder = "stories/"; const mediaFiles = ["1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.jpg", "6.jpg", "7.jpg", "8.mp4", "9.jpg", "10.jpg", "11.jpg", "12.jpg", "13.jpg", "14.mp4", "15.jpg", "16.mp4", "17.mp4", "18.mp4", "19.mp4", "20.jpg", "21.mp4", "22.mp4"];
             const randomMedia = mediaFiles[Math.floor(Math.random() * mediaFiles.length)];
-            tooltip.html(randomMedia.endsWith(".mp4")
-              ? `<video src="${mediaFolder + randomMedia}" autoplay muted loop playsinline style="max-width: 250px; max-height: 500px; border: 1px solid #ccc; border-radius: 5px;"></video><p>Here's a story you posted!</p>`
-              : `<img src="${mediaFolder + randomMedia}" style="max-width: 400px; max-height: 500px; border: 1px solid #ccc; border-radius: 5px;"><p>Here's a story you posted!</p>`);
-            tooltip.style("visibility", "visible");
+            updateTooltipText(randomMedia.endsWith(".mp4")
+              ? `<video src="${mediaFolder + randomMedia}" autoplay muted loop playsinline style="max-width: 250px; max-height: 500px; border: 1px solid #ccc; border-radius: 5px;"></video><div>Here's a story you posted!</div>`
+              : `<img src="${mediaFolder + randomMedia}" style="max-width: 400px; max-height: 500px; border: 1px solid #ccc; border-radius: 5px;"><div>Here's a story you posted!</div>`, "left");
 
             d3.select(this)
                 .transition()
@@ -295,7 +266,7 @@ function ready(data) {
       else if (partId === "lips") {
         const text = "Peeping Tom vs. Peeping Tara <br> <br>This project aims to visualize the contrast between publicly accessible and platform-held personal data on Instagram. All data presented was collected by Instagram in the past three months (Sept, Oct, Nov 2024) and is sourced from Ariel Calver’s Instagram data archive. This data includes: advertisers collecting Ariel's information, her followers, people she is following, her last known location, her comments on posts, her recent profile searches, stories she's posted and their relevant metadata, and topics recommended to her by Instagram based on her activity.<br><br>Hovering over body parts on the left side of the screen will display the data we might expect Instagram to store about her, while hovering over body parts on the right side reveals the data that we may not realize the platform is collecting. By comparing these two perspectives, the project highlights the disparity between human expectations and the machine’s data collection practices."
     // Clear previous tooltip content and add the text
-        updateTooltipText(text, "center");
+        tooltipC.html(text).style("visibility", "visible");
 
     // Optionally, apply a transition effect to the lips element
         d3.select(this)
@@ -314,6 +285,7 @@ function ready(data) {
 
         })
         .on('mouseout', function () { 
+            if (this.id === "lips") tooltipC.style("visibility", "hidden"); // concept box only shows while hovering the mouth
 
             d3.select(this)
                 .transition()
@@ -321,13 +293,7 @@ function ready(data) {
         });
 }
 
-// // Tooltip setup
-const tooltip = d3.select("body").append("div")
-    .attr("class", "tooltip")
-    .style("visibility", "visible") // Start hidden
-    .style("max-height", "100vh") // Tooltip won't grow beyond the viewport height
-    .style("overflow-y", "auto") // Enable vertical scrolling when content overflows
-    .style("position", "fixed")
-    .style("font-size", "20px")
-    .text("");
-
+// Tooltip panels: left half (white) and right half (dark)
+const tooltipL = d3.select("body").append("div").attr("class", "tooltip tooltip-left");
+const tooltipR = d3.select("body").append("div").attr("class", "tooltip tooltip-right");
+const tooltipC = d3.select("body").append("div").attr("class", "tooltip-center").style("visibility", "hidden");
